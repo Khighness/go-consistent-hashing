@@ -35,5 +35,6 @@ Try to use different keys and obserse the proxy server's console log.
 
 ```shell
 $ curl http://curl 127.0.0.1:3333/key?key=${key}
+$ curl http://curl 127.0.0.1:3333/key_least?key=${key}
 ```
 

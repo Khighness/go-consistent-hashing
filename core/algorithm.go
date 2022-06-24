@@ -5,8 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"sync"
+	"sync/atomic"
 )
 
 // @Author KHighness
@@ -37,7 +39,7 @@ type ConsistentHash struct {
 	// replicaNum 缓存服务器在哈希环中对应的虚拟节点数
 	replicaNum int
 
-	// totalLoad 缓存服务器对应的总请求数
+	// totalLoad 代理服务器承受的总负载
 	totalLoad int64
 
 	// hashFunc 哈希函数
@@ -151,12 +153,12 @@ func (ch *ConsistentHash) delHashIndex(val uint64) {
 // GetKey 根据Key查询Host
 func (ch *ConsistentHash) GetHostByKey(key string) (string, error) {
 	hashedIdx := ch.hashFunc(key)
-	idx := ch.searchKey(hashedIdx)
+	idx := ch.searchIndex(hashedIdx)
 	return ch.replicaHostMap[ch.sortedHostHashSet[idx]], nil
 }
 
-// searchKey 根据key在哈希环上顺指针寻找第一台缓存服务器的索引
-func (ch *ConsistentHash) searchKey(key uint64) int {
+// searchIndex 根据key在哈希环上顺指针寻找第一台缓存服务器的索引
+func (ch *ConsistentHash) searchIndex(key uint64) int {
 	idx := sort.Search(len(ch.sortedHostHashSet), func(i int) bool {
 		return ch.sortedHostHashSet[i] >= key
 	})
@@ -167,3 +169,102 @@ func (ch *ConsistentHash) searchKey(key uint64) int {
 	return idx
 }
 
+// GetHostByKeyLeast 有界负载的一致性哈希
+func (ch *ConsistentHash) GetHostByKeyLeast(key string) (string, error) {
+	ch.mu.RLock()
+	defer ch.mu.RLock()
+
+	if len(ch.replicaHostMap) == 0 {
+		return "", ErrHostNotFound
+	}
+
+	hashedIdx := ch.hashFunc(key)
+	idx := ch.searchIndex(hashedIdx)
+
+	i := idx
+	for {
+		address := ch.replicaHostMap[ch.sortedHostHashSet[i]]
+		loadChecked, err := ch.checkLoadCapacity(address)
+		if err != nil {
+			return "", err
+		}
+		if loadChecked {
+			return address, nil
+		}
+		i++
+
+		if i >= len(ch.replicaHostMap) {
+			i = 0
+		}
+	}
+}
+
+// MaxLoad 获取单节点的最大负载
+// (total_load / number_of_hosts) * (1 + load_bound_factor)
+func (ch *ConsistentHash) MaxLoad() int64 {
+	if ch.totalLoad == 0 {
+		ch.totalLoad = 1
+	}
+
+	var avgLoadPerNode float64
+	avgLoadPerNode = float64(ch.totalLoad / int64(len(ch.hostMap)))
+	if avgLoadPerNode == 0 {
+		avgLoadPerNode = 1
+	}
+	avgLoadPerNode = math.Ceil(avgLoadPerNode * (1 + loadBoundFactor))
+	return int64(avgLoadPerNode)
+}
+
+// IncLoad 递增缓存服务器的负载
+func (ch *ConsistentHash) IncLoad(address string) {
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+
+	atomic.AddInt64(&ch.hostMap[address].LoadBound, 1)
+	atomic.AddInt64(&ch.totalLoad, 1)
+}
+
+// DecLoad 递减缓存服务器的负载
+func (ch *ConsistentHash) DecLoad(address string) {
+	ch.mu.Lock()
+	defer ch.mu.Unlock()
+
+	atomic.AddInt64(&ch.hostMap[address].LoadBound, -1)
+	atomic.AddInt64(&ch.totalLoad, -1)
+}
+
+// GetLoads 获取所有缓存服务器的负载数据
+func (ch *ConsistentHash) GetLoads() map[string]int64 {
+	ch.mu.RLock()
+	defer ch.mu.RUnlock()
+
+	loads := make(map[string]int64)
+	for address, host := range ch.hostMap {
+		loads[address] = atomic.LoadInt64(&host.LoadBound)
+	}
+	return loads
+}
+
+// checkLoadCapacity 检验一个缓存服务器是否能在有界负载之内提供服务
+func (ch *ConsistentHash) checkLoadCapacity(address string) (bool, error) {
+	if ch.totalLoad < 0 {
+		ch.totalLoad = 0
+	}
+
+	var avgLoadPerNode float64
+	avgLoadPerNode = float64((ch.totalLoad + 1) / int64(len(ch.hostMap)))
+	if avgLoadPerNode == 0 {
+		avgLoadPerNode = 1
+	}
+	avgLoadPerNode = math.Ceil(avgLoadPerNode * (1 + loadBoundFactor))
+
+	candidateHost, ok := ch.hostMap[address]
+	if !ok {
+		return false, ErrHostNotFound
+	}
+
+	if float64(candidateHost.LoadBound)+1 <= avgLoadPerNode {
+		return true, nil
+	}
+	return false, nil
+}

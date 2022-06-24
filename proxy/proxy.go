@@ -57,3 +57,22 @@ func (p *Proxy) GetKey(key string) (string, error) {
 
 	return string(body), nil
 }
+
+func (p *Proxy) GetKeyLeast(key string) (string, error) {
+	log.Printf("Request key: %s", key)
+	host, err := p.ch.GetHostByKeyLeast(key)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := http.Get(fmt.Sprintf("http://%s?key=%s", host, key))
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+	log.Printf("Response from host %s: %s", host, string(body))
+
+	return string(body), nil
+}
