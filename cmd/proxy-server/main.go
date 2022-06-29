@@ -26,7 +26,7 @@ type ProxyServer struct {
 }
 
 func (s *ProxyServer) Start() {
-	log.Printf("Start proxy serer: %s", s.Address)
+	log.Printf("Start proxy server at %s", s.Address)
 
 	http.HandleFunc("/register", s.registerHost)
 	http.HandleFunc("/unregister", s.unregisterHost)

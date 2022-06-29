@@ -40,7 +40,7 @@ type KVStoreServer struct {
 }
 
 func (s *KVStoreServer) Start(ctx context.Context) {
-	log.Printf("Start kv-server at %s", s.Address)
+	log.Printf("Start kv server at %s", s.Address)
 
 	var err error
 	if err = s.register(); err != nil {
