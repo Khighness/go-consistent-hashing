@@ -150,7 +150,7 @@ func (ch *ConsistentHash) delHashIndex(val uint64) {
 	}
 }
 
-// GetKey 根据Key查询Host
+// GetHostByKey 根据Key查询Host
 func (ch *ConsistentHash) GetHostByKey(key string) (string, error) {
 	hashedIdx := ch.hashFunc(key)
 	idx := ch.searchIndex(hashedIdx)
