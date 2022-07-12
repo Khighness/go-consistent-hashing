@@ -31,10 +31,10 @@ $ go run cmd/kv-server/main.go -p 10003
 
 ### Usage
 
-Try to use different keys and obserse the proxy server's console log.
+Try to use different keys and observe the proxy server's console log.
 
 ```shell
-$ curl http://curl 127.0.0.1:3333/key?key=${key}
-$ curl http://curl 127.0.0.1:3333/key_least?key=${key}
+$ curl http://127.0.0.1:3333/key?key=${key}
+$ curl http://127.0.0.1:3333/key_least?key=${key}
 ```
 
