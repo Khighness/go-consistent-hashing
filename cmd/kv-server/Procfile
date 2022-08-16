@@ -1,0 +1,4 @@
+# Use goreman to run `go install github.com/mattn/goreman@latest`
+kv-server-1: ./kv-server -p 10001
+kv-server-2: ./kv-server -p 10002
+kv-server-3: ./kv-server -p 10003

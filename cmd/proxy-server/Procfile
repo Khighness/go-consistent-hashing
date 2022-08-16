@@ -1,0 +1,2 @@
+# Use goreman to run `go install github.com/mattn/goreman@latest`
+proxy-server: ./proxy-server

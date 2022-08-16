@@ -13,18 +13,22 @@ Golang implementation of consistent-hashing.
 
 ### Start
 
+> First install [goreman](https://github.com/mattn/goreman), which manages Procfile-based applications.
+
 1. Start proxy server
 
 ```shell
-$ go run cmd/proxy-server/main.go
+$ cd cmd/proxy-server
+$ go build -o proxy-server
+$ goreman start
 ```
 
 2. Start kv-store servers
 
 ```shell
-$ go run cmd/kv-server/main.go -p 10001
-$ go run cmd/kv-server/main.go -p 10002
-$ go run cmd/kv-server/main.go -p 10003
+$ cd cmd/kv-server
+$ go build -o kv-server
+$ goreman start
 ```
 
 
